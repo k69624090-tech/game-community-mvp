@@ -10,14 +10,24 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  const { data: profile } = user
-    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
-    : { data: null };
-  const isAdmin = profile?.role === "admin";
+  let user: { id: string } | null = null;
+  let isAdmin = false;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user: fetchedUser }
+    } = await supabase.auth.getUser();
+    user = fetchedUser ? { id: fetchedUser.id } : null;
+
+    if (fetchedUser) {
+      const { data: profile } = await supabase.from("users").select("role").eq("id", fetchedUser.id).maybeSingle();
+      isAdmin = profile?.role === "admin";
+    }
+  } catch {
+    user = null;
+    isAdmin = false;
+  }
 
   return (
     <html lang="ja">
