@@ -48,35 +48,41 @@ export async function signUpAction(formData: FormData) {
 }
 
 export async function signInAction(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  if (!email || !password) {
+    redirect(withError("/login", "入力が不足しています"));
+  }
+
+  const supabase = await createSupabaseServerClient();
+  let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"] | null = null;
+  let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"] | null = null;
+
   try {
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-    if (!email || !password) {
-      redirect(withError("/login", "入力が不足しています"));
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      redirect(`/login?error=${encodeURIComponent(error.message)}`);
-    }
-
-    const signedInUserId = data.user?.id ?? null;
-    if (signedInUserId) {
-      try {
-        const { data: profile } = await supabase.from("users").select("role").eq("id", signedInUserId).maybeSingle();
-        if (profile?.role === "admin") {
-          redirect("/admin");
-        }
-      } catch {
-        // usersテーブル未作成/クエリエラー時は一般ユーザー遷移へフォールバック
-      }
-    }
-
-    redirect("/");
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    data = result.data;
+    error = result.error;
   } catch {
     redirect(withError("/login", "ログイン処理中にエラーが発生しました"));
   }
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const signedInUserId = data?.user?.id ?? null;
+  if (signedInUserId) {
+    try {
+      const { data: profile } = await supabase.from("users").select("role").eq("id", signedInUserId).maybeSingle();
+      if (profile?.role === "admin") {
+        redirect("/admin");
+      }
+    } catch {
+      // usersテーブル未作成/クエリエラー時は一般ユーザー遷移へフォールバック
+    }
+  }
+
+  redirect("/");
 }
 
 export async function signOutAction() {
