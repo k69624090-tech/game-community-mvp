@@ -35,7 +35,7 @@ export async function signUpAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!email || !password) {
-    redirect("/signup?error=入力が不足しています");
+    redirect(withError("/signup", "入力が不足しています"));
   }
 
   const supabase = await createSupabaseServerClient();
@@ -52,7 +52,7 @@ export async function signInAction(formData: FormData) {
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     if (!email || !password) {
-      redirect("/login?error=入力が不足しています");
+      redirect(withError("/login", "入力が不足しています"));
     }
 
     const supabase = await createSupabaseServerClient();
@@ -75,7 +75,7 @@ export async function signInAction(formData: FormData) {
 
     redirect("/");
   } catch {
-    redirect("/login?error=ログイン処理中にエラーが発生しました");
+    redirect(withError("/login", "ログイン処理中にエラーが発生しました"));
   }
 }
 
@@ -94,16 +94,16 @@ export async function createPostAction(formData: FormData) {
   const spoilerFlag = formData.get("spoilerFlag") === "on";
 
   if (!gameId || !categoryId || !body) {
-    redirect("/create?error=必須項目を入力してください");
+    redirect(withError("/create", "必須項目を入力してください"));
   }
 
   const supabase = await createSupabaseServerClient();
   const { data: category } = await supabase.from("categories").select("game_id").eq("id", categoryId).maybeSingle();
   if (!category) {
-    redirect("/create?error=カテゴリが見つかりません");
+    redirect(withError("/create", "カテゴリが見つかりません"));
   }
   if (category.game_id && category.game_id !== gameId) {
-    redirect("/create?error=ゲームとカテゴリの組み合わせが正しくありません");
+    redirect(withError("/create", "ゲームとカテゴリの組み合わせが正しくありません"));
   }
 
   const { data, error } = await supabase
@@ -120,7 +120,7 @@ export async function createPostAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect("/create?error=投稿に失敗しました");
+    redirect(withError("/create", "投稿に失敗しました"));
   }
 
   revalidatePath("/");
@@ -212,7 +212,7 @@ export async function updateProfileAction(formData: FormData) {
   const favoriteGamesRaw = String(formData.get("favoriteGames") ?? "").trim();
 
   if (userId !== profileId) {
-    redirect(`/profile/${profileId}?error=他ユーザーの編集はできません`);
+    redirect(withError(`/profile/${profileId}`, "他ユーザーの編集はできません"));
   }
 
   const favoriteGames = favoriteGamesRaw
@@ -234,7 +234,7 @@ export async function updateProfileAction(formData: FormData) {
     .eq("id", userId);
 
   if (error) {
-    redirect(`/profile/${profileId}?error=更新に失敗しました`);
+    redirect(withError(`/profile/${profileId}`, "更新に失敗しました"));
   }
 
   revalidatePath(`/profile/${profileId}`);
