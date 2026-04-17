@@ -18,8 +18,16 @@ function withNotice(path: string, notice: string): string {
   return `${path}${separator}notice=${encodeURIComponent(notice)}`;
 }
 
-async function requireUserId() {
-  const supabase = await createSupabaseServerClient();
+async function getServerClientOrRedirect(path: string) {
+  try {
+    return await createSupabaseServerClient();
+  } catch {
+    redirect(withError(path, "サーバー設定が未完了です。管理者へお問い合わせください。"));
+  }
+}
+
+async function requireUserId(redirectPath = "/login") {
+  const supabase = await getServerClientOrRedirect(redirectPath);
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -38,7 +46,7 @@ export async function signUpAction(formData: FormData) {
     redirect(withError("/signup", "入力が不足しています"));
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect("/signup");
   const { error } = await supabase.auth.signUp({ email, password });
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
@@ -54,7 +62,7 @@ export async function signInAction(formData: FormData) {
     redirect(withError("/login", "入力が不足しています"));
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect("/login");
   let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"] | null = null;
   let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"] | null = null;
 
@@ -86,13 +94,13 @@ export async function signInAction(formData: FormData) {
 }
 
 export async function signOutAction() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect("/");
   await supabase.auth.signOut();
   redirect("/");
 }
 
 export async function createPostAction(formData: FormData) {
-  const userId = await requireUserId();
+  const userId = await requireUserId("/login");
   const gameId = String(formData.get("gameId") ?? "");
   const categoryId = String(formData.get("categoryId") ?? "");
   const title = String(formData.get("title") ?? "").trim();
@@ -103,7 +111,7 @@ export async function createPostAction(formData: FormData) {
     redirect(withError("/create", "必須項目を入力してください"));
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect("/create");
   const { data: category } = await supabase.from("categories").select("game_id").eq("id", categoryId).maybeSingle();
   if (!category) {
     redirect(withError("/create", "カテゴリが見つかりません"));
@@ -135,15 +143,15 @@ export async function createPostAction(formData: FormData) {
 }
 
 export async function addCommentAction(formData: FormData) {
-  const userId = await requireUserId();
   const postId = String(formData.get("postId") ?? "");
+  const userId = await requireUserId(`/posts/${postId}`);
   const body = String(formData.get("body") ?? "").trim();
 
   if (!postId || !body) {
     redirect(`/posts/${postId}`);
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect(`/posts/${postId}`);
   const { error } = await supabase.from("comments").insert({
     post_id: postId,
     user_id: userId,
@@ -158,15 +166,15 @@ export async function addCommentAction(formData: FormData) {
 }
 
 export async function addReactionAction(formData: FormData) {
-  const userId = await requireUserId();
   const postId = String(formData.get("postId") ?? "");
+  const userId = await requireUserId(`/posts/${postId}`);
   const reactionType = String(formData.get("reactionType") ?? "") as ReactionType;
 
   if (!postId || !allowedReactions.includes(reactionType)) {
     redirect(`/posts/${postId}`);
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect(`/posts/${postId}`);
   const { error } = await supabase.from("reactions").insert({
     post_id: postId,
     user_id: userId,
@@ -183,7 +191,8 @@ export async function addReactionAction(formData: FormData) {
 }
 
 export async function reportAction(formData: FormData) {
-  const userId = await requireUserId();
+  const referer = String(formData.get("redirectTo") ?? "/");
+  const userId = await requireUserId(referer);
   const targetType = String(formData.get("targetType") ?? "") as "post" | "comment" | "user";
   const targetId = String(formData.get("targetId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
@@ -192,7 +201,7 @@ export async function reportAction(formData: FormData) {
     redirect("/");
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect(referer);
   const { error } = await supabase.from("reports").insert({
     target_type: targetType,
     target_id: targetId,
@@ -200,7 +209,6 @@ export async function reportAction(formData: FormData) {
     reason
   });
 
-  const referer = String(formData.get("redirectTo") ?? "/");
   if (error) {
     redirect(withError(referer, "通報に失敗しました"));
   }
@@ -210,8 +218,8 @@ export async function reportAction(formData: FormData) {
 }
 
 export async function updateProfileAction(formData: FormData) {
-  const userId = await requireUserId();
   const profileId = String(formData.get("profileId") ?? "");
+  const userId = await requireUserId(`/profile/${profileId}`);
   const username = String(formData.get("username") ?? "").trim();
   const avatarUrl = String(formData.get("avatarUrl") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
@@ -228,7 +236,7 @@ export async function updateProfileAction(formData: FormData) {
         .filter(Boolean)
     : [];
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await getServerClientOrRedirect(`/profile/${profileId}`);
   const { error } = await supabase
     .from("users")
     .update({
