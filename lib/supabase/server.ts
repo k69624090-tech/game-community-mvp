@@ -21,9 +21,16 @@ export async function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(_cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
-          // Server Components cannot mutate cookies.
-          // We intentionally no-op here to avoid runtime crashes in SSR rendering.
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
+          // Server Actions / Route Handlers can mutate cookies.
+          // Server Components cannot; ignore that runtime error only there.
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // no-op in Server Components
+          }
         }
       }
     }
