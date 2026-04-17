@@ -8,10 +8,16 @@ export default async function CreatePostPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user: fetchedUser }
+    } = await supabase.auth.getUser();
+    user = fetchedUser ? { id: fetchedUser.id } : null;
+  } catch {
+    user = null;
+  }
 
   if (!user) {
     redirect("/login");
