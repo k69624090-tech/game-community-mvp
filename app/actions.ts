@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseActionClient } from "@/lib/supabase/server";
 import { ReactionType } from "@/types/models";
 
 const allowedReactions: ReactionType[] = ["like", "wakaru", "suki", "cried", "lol", "helpful"];
@@ -20,7 +20,7 @@ function withNotice(path: string, notice: string): string {
 
 async function getServerClientOrRedirect(path: string) {
   try {
-    return await createSupabaseServerClient();
+    return await createSupabaseActionClient();
   } catch {
     redirect(withError(path, "サーバー設定が未完了です。管理者へお問い合わせください。"));
   }
